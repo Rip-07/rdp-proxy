@@ -43,7 +43,7 @@ jobs:
 
   deploy:
     name: Deploy to Unraid
-    runs-on: [self-hosted, linux, x64]
+    runs-on: self-hosted
     needs:
       - validate
     if: github.event_name == 'push'
