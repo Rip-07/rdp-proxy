@@ -55,9 +55,10 @@ where
                 match accept {
                     Ok((stream, peer)) => {
                         let handler = handler.clone();
-                        let expected_path = expected_path;
                         tokio::spawn(async move {
-                            if let Err(err) = handle_connection(stream, peer, expected_path, handler).await {
+                            if let Err(err) =
+                                handle_connection(stream, peer, expected_path, handler).await
+                            {
                                 error!(%peer, error = %err, "http connection failed");
                             }
                         });

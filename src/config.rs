@@ -38,19 +38,14 @@ pub struct AppConfig {
 }
 
 /// Log format selection.
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum LogFormat {
     /// Human-readable text logs.
+    #[default]
     Text,
     /// JSON logs.
     Json,
-}
-
-impl Default for LogFormat {
-    fn default() -> Self {
-        Self::Text
-    }
 }
 
 #[derive(Debug, Default, Deserialize)]
