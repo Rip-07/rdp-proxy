@@ -156,7 +156,7 @@ CD запускается автоматически на `push` в `main` и в
 5. синхронизация репозитория в `/opt/rdp-proxy`
 6. `docker compose up -d --build --remove-orphans`
 
-Это выполняется на том же Unraid-хосте, где работает runner.
+Валидация может идти на обычном runner, а деплой должен идти на self-hosted runner на Unraid-хосте.
 
 Для этого на runner-хосте должны быть доступны:
 

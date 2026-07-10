@@ -3,7 +3,7 @@ name: Build and Deploy RDP Proxy
 on:
   push:
     branches:
-      - main
+      - master
   workflow_dispatch:
 
 permissions:
@@ -42,7 +42,7 @@ jobs:
 
   deploy:
     name: Deploy to Unraid
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     needs:
       - validate
 
