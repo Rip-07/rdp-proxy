@@ -1,20 +1,27 @@
-name: ci
+name: Build, Test, and Deploy RDP Proxy
 
 on:
   push:
     branches:
       - master
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  APP_DIR: /opt/rdp-proxy
+  CONTAINER_NAME: rdp-proxy
+  COMPOSE_PROJECT_NAME: rdp-proxy
+
 jobs:
-  build:
+  validate:
+    name: Validate Rust app
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Rust
@@ -33,3 +40,100 @@ jobs:
 
       - name: Test
         run: cargo test --all-targets --all-features
+
+  deploy:
+    name: Deploy to Unraid
+    runs-on: [self-hosted, linux, x64]
+    needs:
+      - validate
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Docker access
+        run: |
+          set -e
+          docker version
+          docker compose version || true
+
+      - name: Prepare app directory
+        run: |
+          set -e
+          mkdir -p "${APP_DIR}"
+
+      - name: Sync project files
+        run: |
+          set -e
+
+          if ! command -v rsync >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y --no-install-recommends rsync
+            rm -rf /var/lib/apt/lists/*
+          fi
+
+          rsync -av --delete \
+            --exclude ".git" \
+            --exclude ".gitea" \
+            --exclude ".idea" \
+            --exclude ".env" \
+            --exclude "target" \
+            --exclude "*.log" \
+            ./ "${APP_DIR}/"
+
+      - name: Deploy with Docker Compose
+        run: |
+          set -e
+
+          cd "${APP_DIR}"
+
+          echo "Docker version:"
+          docker version
+
+          echo "Docker Compose version:"
+          docker compose version
+
+          echo "Starting deployment..."
+
+          COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME}" \
+          docker compose up -d --build --remove-orphans
+
+      - name: Check container status
+        run: |
+          set -e
+
+          docker ps --filter "name=${CONTAINER_NAME}"
+
+          echo "Recent logs:"
+          docker logs --tail 80 "${CONTAINER_NAME}" || true
+
+          STATUS="$(docker inspect -f '{{.State.Status}}' "${CONTAINER_NAME}" 2>/dev/null || echo unknown)"
+          RESTARTING="$(docker inspect -f '{{.State.Restarting}}' "${CONTAINER_NAME}" 2>/dev/null || echo true)"
+
+          echo "Container status: ${STATUS}"
+          echo "Restarting: ${RESTARTING}"
+
+          if [ "${STATUS}" != "running" ]; then
+            echo "ERROR: container is not running"
+            exit 1
+          fi
+
+          if [ "${RESTARTING}" = "true" ]; then
+            echo "ERROR: container is restarting"
+            exit 1
+          fi
+
+      - name: Wait for health
+        run: |
+          set -e
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "ERROR: health check failed"
+          exit 1

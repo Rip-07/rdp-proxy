@@ -138,16 +138,16 @@ docker compose up -d --build
 
 ## Gitea CI/CD
 
-Workflow-файлы лежат в `.gitea/workflows/`.
+Workflow-файл лежит в `.gitea/workflows/ci.yml`.
 
-CI запускается на `gitea-runner` на `push` и `pull_request`:
+CI запускается на `pull_request` и на `push` в `main` или `master`:
 
 - `cargo fmt --check`
 - `cargo clippy --all-targets --all-features -- -D warnings`
 - `cargo check --all-targets --all-features`
 - `cargo test --all-targets --all-features`
 
-CD запускается автоматически на `push` в `main` и выполняет полную схему:
+CD запускается автоматически на `push` в `main` или `master` и выполняет полную схему:
 
 1. `cargo fmt --check`
 2. `cargo clippy --all-targets --all-features -- -D warnings`
@@ -156,7 +156,7 @@ CD запускается автоматически на `push` в `main` и в
 5. синхронизация репозитория в `/opt/rdp-proxy`
 6. `docker compose up -d --build --remove-orphans`
 
-Валидация может идти на обычном runner, а деплой должен идти на self-hosted runner на Unraid-хосте.
+Валидация идет на обычном runner, а деплой должен идти на self-hosted runner на Unraid-хосте.
 
 Для этого на runner-хосте должны быть доступны:
 
