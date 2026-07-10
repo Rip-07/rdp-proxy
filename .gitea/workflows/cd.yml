@@ -2,9 +2,8 @@ name: cd
 
 on:
   push:
-    tags:
-      - "v*"
-  workflow_dispatch:
+    branches:
+      - master
 
 permissions:
   contents: read

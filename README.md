@@ -147,7 +147,7 @@ CI запускается на self-hosted `gitea-runner` на `push` и `pull_r
 - `cargo check --all-targets --all-features`
 - `cargo test --all-targets --all-features`
 
-CD запускается по тегам `v*` или вручную и выполняет `docker compose up -d --build --remove-orphans` на том же Unraid-хосте, где работает runner.
+CD запускается автоматически на `push` в `main` и выполняет `docker compose up -d --build --remove-orphans` на том же Unraid-хосте, где работает runner.
 
 Для этого на runner-хосте должны быть доступны:
 
