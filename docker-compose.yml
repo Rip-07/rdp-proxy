@@ -1,5 +1,6 @@
 services:
   rdp-proxy:
+    container_name: rdp-proxy
     build: .
     network_mode: host
     restart: unless-stopped
