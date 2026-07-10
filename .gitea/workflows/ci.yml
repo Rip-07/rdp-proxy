@@ -129,9 +129,16 @@ jobs:
           set -e
 
           for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+            STATUS="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-health{{end}}' "${CONTAINER_NAME}" 2>/dev/null || echo missing)"
+
+            if [ "${STATUS}" = "healthy" ]; then
               exit 0
             fi
+
+            if [ "${STATUS}" = "unhealthy" ] || [ "${STATUS}" = "missing" ] || [ "${STATUS}" = "no-health" ]; then
+              echo "Container health status: ${STATUS}"
+            fi
+
             sleep 2
           done
 
