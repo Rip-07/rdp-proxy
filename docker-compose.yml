@@ -1,0 +1,12 @@
+services:
+  rdp-proxy:
+    build: .
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      RDP_PROXY_LOG_LEVEL: info
+      RDP_PROXY_LOG_FORMAT: text
+      RDP_PROXY_LISTEN_HOST: 0.0.0.0
+      RDP_PROXY_LISTEN_PORT: 3389
+      RDP_PROXY_TARGET_HOST: 192.0.2.10
+      RDP_PROXY_TARGET_PORT: 3389

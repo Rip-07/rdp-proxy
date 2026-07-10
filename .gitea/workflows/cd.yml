@@ -1,0 +1,35 @@
+name: cd
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, x64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Docker version
+        run: docker version
+
+      - name: Build and deploy
+        run: docker compose up -d --build --remove-orphans
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "health check failed"
+          exit 1
