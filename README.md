@@ -1,6 +1,6 @@
 # rdp-proxy
 
-Прозрачный TCP-прокси для RDP. Приложение слушает `0.0.0.0:3389` и без какого-либо разбора протокола пересылает байты на `192.0.2.10:3389` через обычную таблицу маршрутизации хоста. WireGuard настраивается отдельно и этим проектом не управляется.
+Прозрачный TCP-прокси для RDP. Приложение слушает `0.0.0.0:3389` и без какого-либо разбора протокола пересылает байты на целевой хост (например, `192.0.2.10:3389`) через обычную таблицу маршрутизации хоста. WireGuard настраивается отдельно и этим проектом не управляется.
 
 ## Сборка
 
@@ -15,6 +15,8 @@ cargo run --release
 ```
 
 По умолчанию читается `config.yaml`, если файл существует. Переменные окружения имеют приоритет над YAML.
+
+`target_host` (`RDP_PROXY_TARGET_HOST`) обязателен: без него прокси завершится с ошибкой конфигурации. Пример переменных — в `.env.example`.
 
 ## Конфигурация
 
@@ -125,48 +127,28 @@ docker build -t rdp-proxy .
 Запуск:
 
 ```bash
-docker run --rm --network host rdp-proxy
+docker run --rm --network host -e RDP_PROXY_TARGET_HOST=192.0.2.10 rdp-proxy
 ```
 
 Compose:
 
 ```bash
+cp .env.example .env   # укажите RDP_PROXY_TARGET_HOST
 docker compose up -d --build
 ```
 
 Контейнер запускается от непривилегированного пользователя. Встроен `HEALTHCHECK`.
 
-## Gitea CI/CD
+## CI
 
-Workflow-файл лежит в `.gitea/workflows/ci.yml`.
+GitHub Actions (`.github/workflows/ci.yml`) запускается на `push` в `main` и на `pull_request`:
 
-CI запускается на `pull_request` и на `push` в `main` или `master`:
-
-- `cargo fmt --check`
+- `cargo fmt --all --check`
 - `cargo clippy --all-targets --all-features -- -D warnings`
-- `cargo check --all-targets --all-features`
 - `cargo test --all-targets --all-features`
+- `docker build`
 
-CD запускается автоматически на `push` в `main` или `master` и выполняет полную схему:
-
-1. `cargo fmt --check`
-2. `cargo clippy --all-targets --all-features -- -D warnings`
-3. `cargo check --all-targets --all-features`
-4. `cargo test --all-targets --all-features`
-5. синхронизация репозитория в `/opt/rdp-proxy`
-6. `docker compose up -d --build --remove-orphans`
-
-Валидация идет на обычном runner, а деплой должен идти на self-hosted runner на Unraid-хосте.
-
-Для этого на runner-хосте должны быть доступны:
-
-- Docker
-- Docker Compose
-- сеть host networking
-
-Registry не нужен.
-
-## Unraid
+## Unraid / homelab
 
 Используйте `docker-compose.yml` или создайте контейнер вручную с `network_mode: host`.
 
@@ -174,7 +156,7 @@ Registry не нужен.
 
 1. Host networking должен быть включён.
 2. Порт `3389` не должен быть занят другим сервисом.
-3. На хосте должна быть уже поднята маршрутизация до `192.0.2.10` через WireGuard.
+3. На хосте должна быть уже поднята маршрутизация до целевого хоста (например, `192.0.2.10`) через WireGuard.
 
 ## Пример WireGuard
 
@@ -196,4 +178,45 @@ ip route add 192.0.2.0/24 dev wg0
 
 ## Лицензия
 
-MIT
+MIT — см. [LICENSE](LICENSE).
+
+## English
+
+**rdp-proxy** is a small transparent TCP proxy for RDP written in Rust (Tokio). It listens on `0.0.0.0:3389` and forwards raw bytes to a target host without parsing the protocol, using the host's normal routing table (for example, a WireGuard tunnel configured separately). Useful in a homelab to expose a single RDP endpoint that lives behind a VPN.
+
+Features: YAML + environment configuration, optional IP/CIDR allow-list and connection limit, text/JSON logs with per-connection duration and byte counters, `/health` endpoint (port 8080), Prometheus `/metrics` (port 9090), graceful shutdown, non-root Docker image with `HEALTHCHECK`.
+
+### Configuration
+
+Settings are read from `config.yaml` (if present) and overridden by `RDP_PROXY_*` environment variables. `target_host` is required. See `.env.example` for the full list:
+
+| Variable | Default |
+|---|---|
+| `RDP_PROXY_TARGET_HOST` | — (required) |
+| `RDP_PROXY_TARGET_PORT` | `3389` |
+| `RDP_PROXY_LISTEN_HOST` / `RDP_PROXY_LISTEN_PORT` | `0.0.0.0` / `3389` |
+| `RDP_PROXY_CONNECT_TIMEOUT_MS` | `10000` |
+| `RDP_PROXY_TCP_KEEPALIVE` / `RDP_PROXY_TCP_NODELAY` | `true` / `true` |
+| `RDP_PROXY_BACKLOG` | `1024` |
+| `RDP_PROXY_LOG_LEVEL` / `RDP_PROXY_LOG_FORMAT` | `info` / `text` |
+| `RDP_PROXY_CONNECTION_LIMIT` | unlimited |
+| `RDP_PROXY_ALLOWED_IPS` | allow all (comma-separated IPs/CIDRs) |
+
+### Run
+
+```bash
+# from source
+RDP_PROXY_TARGET_HOST=192.0.2.10 cargo run --release
+
+# Docker (host networking so the proxy can use the host routes)
+docker build -t rdp-proxy .
+docker run --rm --network host -e RDP_PROXY_TARGET_HOST=192.0.2.10 rdp-proxy
+
+# Docker Compose
+cp .env.example .env   # set RDP_PROXY_TARGET_HOST
+docker compose up -d --build
+```
+
+### License
+
+MIT — see [LICENSE](LICENSE).

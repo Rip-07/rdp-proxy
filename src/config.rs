@@ -154,7 +154,12 @@ impl AppConfig {
             .unwrap_or(3389);
         let target_host = env_ip("RDP_PROXY_TARGET_HOST")
             .or(file.target_host)
-            .unwrap_or_else(|| Ipv4Addr::new(192, 0, 2, 10).into());
+            .ok_or_else(|| {
+                AppError::Config(
+                    "target_host is required (set RDP_PROXY_TARGET_HOST or target_host in YAML)"
+                        .to_string(),
+                )
+            })?;
         let target_port = env_u16("RDP_PROXY_TARGET_PORT")
             .or(file.target_port)
             .unwrap_or(3389);
@@ -282,4 +287,66 @@ fn env_allowed_ips(key: &str) -> Option<AnyResult<Vec<IpFilter>>> {
         .map(IpFilter::parse)
         .collect::<AnyResult<Vec<_>>>();
     Some(values)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ip(value: &str) -> IpAddr {
+        value.parse().unwrap()
+    }
+
+    #[test]
+    fn exact_ip_filter_matches_only_that_address() {
+        let filter = IpFilter::parse("203.0.113.5").unwrap();
+        assert!(filter.matches(ip("203.0.113.5")));
+        assert!(!filter.matches(ip("203.0.113.6")));
+    }
+
+    #[test]
+    fn ipv4_cidr_filter_matches_range() {
+        let filter = IpFilter::parse("198.51.100.0/24").unwrap();
+        assert!(filter.matches(ip("198.51.100.1")));
+        assert!(filter.matches(ip("198.51.100.255")));
+        assert!(!filter.matches(ip("198.51.101.1")));
+        assert!(!filter.matches(ip("2001:db8::1")));
+    }
+
+    #[test]
+    fn ipv6_cidr_filter_matches_range() {
+        let filter = IpFilter::parse("2001:db8::/32").unwrap();
+        assert!(filter.matches(ip("2001:db8:1::1")));
+        assert!(!filter.matches(ip("2001:db9::1")));
+    }
+
+    #[test]
+    fn zero_prefix_matches_everything_in_family() {
+        let filter = IpFilter::parse("0.0.0.0/0").unwrap();
+        assert!(filter.matches(ip("192.0.2.10")));
+    }
+
+    #[test]
+    fn invalid_filters_are_rejected() {
+        assert!(IpFilter::parse("not-an-ip").is_err());
+        assert!(IpFilter::parse("192.0.2.0/abc").is_err());
+        assert!(IpFilter::parse("192.0.2.0/").is_err());
+    }
+
+    #[test]
+    fn log_format_parsing() {
+        assert!(matches!(parse_log_format("JSON"), Ok(LogFormat::Json)));
+        assert!(matches!(parse_log_format(" text "), Ok(LogFormat::Text)));
+        assert!(parse_log_format("xml").is_err());
+    }
+
+    #[test]
+    fn yaml_config_is_parsed() {
+        let yaml =
+            "target_host: 192.0.2.10\ntarget_port: 3390\nallowed_ips:\n  - 198.51.100.0/24\n";
+        let file: FileConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(file.target_host, Some(ip("192.0.2.10")));
+        assert_eq!(file.target_port, Some(3390));
+        assert_eq!(file.allowed_ips.unwrap().len(), 1);
+    }
 }
