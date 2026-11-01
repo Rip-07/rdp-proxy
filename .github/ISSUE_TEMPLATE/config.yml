@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: mailto:info@fahrentech.kz
+    about: Please report security problems privately by email, not in a public issue.
